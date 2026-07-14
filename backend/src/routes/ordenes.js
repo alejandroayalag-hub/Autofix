@@ -107,7 +107,7 @@ router.get('/:id', (req, res) => {
 
 // ─── POST /api/ordenes ───────────────────────────────────────────────────────
 router.post('/', (req, res) => {
-  const { auto_id, cliente_id, odometro, fecha_entrega_estimada, notas_recepcion, tipo_servicio } = req.body;
+  const { auto_id, cliente_id, odometro, fecha_entrega_estimada, notas_recepcion, tipo_servicio, tipo_flujo, estatus_inicial } = req.body;
   if (!auto_id) return res.status(400).json({ error: 'auto_id es requerido' });
 
   // Si no se pasa cliente_id, intentar obtenerlo del auto
@@ -117,10 +117,14 @@ router.post('/', (req, res) => {
     if (auto) cid = auto.cliente_id || null;
   }
 
+  const tipoFlujoVal = ['flujo_1', 'flujo_2', 'flujo_3'].includes(tipo_flujo) ? tipo_flujo : 'flujo_2';
+  // Flujo 1 arranca en cotización (aún sin unidad); los demás en recepción
+  const estatusIni = (tipoFlujoVal === 'flujo_1' && estatus_inicial === 'en_cotizacion') ? 'en_cotizacion' : 'recepcion';
+
   const r = db.prepare(`
-    INSERT INTO ordenes_trabajo (auto_id, cliente_id, estatus, odometro, fecha_entrega_estimada, notas_recepcion, tipo_servicio)
-    VALUES (?, ?, 'recepcion', ?, ?, ?, ?)
-  `).run(auto_id, cid, odometro || null, fecha_entrega_estimada || null, notas_recepcion || null, tipo_servicio || null);
+    INSERT INTO ordenes_trabajo (auto_id, cliente_id, estatus, tipo_flujo, odometro, fecha_entrega_estimada, notas_recepcion, tipo_servicio)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(auto_id, cid, estatusIni, tipoFlujoVal, odometro || null, fecha_entrega_estimada || null, notas_recepcion || null, tipo_servicio || null);
 
   const ot = db.prepare(`
     SELECT ot.*, a.placa, a.marca, a.modelo, cl.nombre AS cliente_nombre

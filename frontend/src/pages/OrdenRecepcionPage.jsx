@@ -19,9 +19,34 @@ const CAMPO = ({ label, children, required }) => (
 
 const STEPS = ['Cliente', 'Auto', 'Recepción'];
 
+const FLUJOS = [
+  {
+    key: 'flujo_1',
+    titulo: 'Flujo 1',
+    subtitulo: 'Cotización previa',
+    desc: 'El cliente aprobó por teléfono. Se genera cotización antes de recibir la unidad.',
+    badge: '#eff6ff', badgeText: '#1d4ed8', border: '#bfdbfe',
+  },
+  {
+    key: 'flujo_2',
+    titulo: 'Flujo 2',
+    subtitulo: 'Diagnóstico en taller',
+    desc: 'La unidad llega sin cita. Se diagnostica y cotiza con el auto presente.',
+    badge: '#f3f4f6', badgeText: '#374151', border: '#d1d5db',
+  },
+  {
+    key: 'flujo_3',
+    titulo: 'Flujo 3',
+    subtitulo: 'Reparación progresiva',
+    desc: 'Costo variable. Los gastos se registran en tiempo real y se consulta al cliente ante imprevistos.',
+    badge: '#fff7ed', badgeText: '#c2410c', border: '#fed7aa',
+  },
+];
+
 export default function OrdenRecepcionPage() {
   const navigate = useNavigate();
   const [paso, setPaso] = useState(1);
+  const [tipoFlujo, setTipoFlujo] = useState(null); // null = aún no elegido
 
   // Paso 1 – cliente
   const [clientes, setClientes] = useState([]);
@@ -129,9 +154,12 @@ export default function OrdenRecepcionPage() {
         fecha_entrega_estimada: recepcion.fecha_entrega_estimada || null,
         notas_recepcion: recepcion.notas_recepcion || null,
         tipo_servicio: tipoServicio,
+        tipo_flujo: tipoFlujo,
+        ...(tipoFlujo === 'flujo_1' ? { estatus_inicial: 'en_cotizacion' } : {}),
       });
       const orden = res.data?.data ?? res.data;
-      navigate(`/ordenes/${orden.id}/diagnostico`);
+      // F2 va directo a diagnóstico; F1 y F3 al detalle de la orden
+      navigate(tipoFlujo === 'flujo_2' ? `/ordenes/${orden.id}/diagnostico` : `/ordenes/${orden.id}`);
     } catch (err) {
       setErrorOrden(err.response?.data?.error || 'Error al crear orden');
     } finally {
@@ -140,6 +168,37 @@ export default function OrdenRecepcionPage() {
   };
 
   const card = 'bg-white rounded-xl border border-[#e5e5e5] p-5';
+
+  // Selector de flujo antes del wizard
+  if (!tipoFlujo) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/ordenes')} className="text-[#9ca3af] hover:text-[#374151] text-sm">← Volver</button>
+          <h1 className="text-base font-bold text-[#111]">Nueva orden de trabajo</h1>
+        </div>
+        <p className="text-sm text-[#6b7280]">Selecciona cómo llega este servicio al taller:</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {FLUJOS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setTipoFlujo(f.key)}
+              className="text-left p-5 rounded-xl border-2 hover:shadow-md transition-all"
+              style={{ borderColor: f.border, background: f.badge }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg font-extrabold" style={{ color: f.badgeText }}>{f.titulo}</span>
+                <span className="text-xs font-semibold" style={{ color: f.badgeText }}>{f.subtitulo}</span>
+              </div>
+              <p className="text-xs text-[#374151] leading-relaxed">{f.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const flujoSel = FLUJOS.find(f => f.key === tipoFlujo);
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -152,6 +211,14 @@ export default function OrdenRecepcionPage() {
           ← Volver
         </button>
         <h1 className="text-base font-bold text-[#111]">Nueva orden de trabajo</h1>
+        <button
+          onClick={() => setTipoFlujo(null)}
+          title="Cambiar flujo"
+          className="ml-auto text-xs font-bold px-3 py-1 rounded-full border"
+          style={{ background: flujoSel.badge, color: flujoSel.badgeText, borderColor: flujoSel.border }}
+        >
+          {flujoSel.titulo} — {flujoSel.subtitulo} ✎
+        </button>
       </div>
 
       {/* Indicador de pasos */}
