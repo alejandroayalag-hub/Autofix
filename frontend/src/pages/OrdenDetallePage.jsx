@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getOrden, updateOrdenEstatus } from '../api/ordenes';
+import { getOrden, updateOrdenEstatus, updateOrdenTipoFlujo } from '../api/ordenes';
 import { getChecklist, addChecklistItem, toggleChecklistItem, deleteChecklistItem } from '../api/checklist';
+import { getProgresos, addProgreso, deleteProgreso } from '../api/progresos';
+import { getGastos, addGasto, deleteGasto } from '../api/gastos';
+
+const ESTADOS_TALLER = ['en_taller', 'pausado_consulta', 'listo_entrega', 'en_cierre', 'entregado'];
+const fmtMonto = n => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
 
 const ESTATUS_STYLE = {
   en_cotizacion:    { bg: '#eff6ff', text: '#1d4ed8',  label: 'En cotización' },
@@ -136,12 +141,74 @@ export default function OrdenDetallePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Progreso y gastos F3
+  const [progresos, setProgresos] = useState([]);
+  const [gastos, setGastos] = useState([]);
+  const [totalGastos, setTotalGastos] = useState(0);
+  const [nuevoProgreso, setNuevoProgreso] = useState('');
+  const [nuevoGasto, setNuevoGasto] = useState({ descripcion: '', monto: '', tipo: 'refaccion' });
+  const [guardandoProg, setGuardandoProg] = useState(false);
+  const [guardandoGasto, setGuardandoGasto] = useState(false);
+
   const cargar = () => {
     setLoading(true);
     getOrden(id)
-      .then(data => setOrden(data.data?.data ?? data.data))
+      .then(data => {
+        const o = data.data?.data ?? data.data;
+        setOrden(o);
+        if (ESTADOS_TALLER.includes(o?.estatus)) {
+          getProgresos(id).then(r => setProgresos(r.data?.data ?? [])).catch(() => {});
+          getGastos(id).then(r => { setGastos(r.data?.data ?? []); setTotalGastos(r.data?.total ?? 0); }).catch(() => {});
+        }
+      })
       .catch(() => setError('No se pudo cargar la orden'))
       .finally(() => setLoading(false));
+  };
+
+  const handleAddProgreso = async () => {
+    if (!nuevoProgreso.trim()) return;
+    setGuardandoProg(true);
+    try {
+      await addProgreso(id, nuevoProgreso.trim());
+      setNuevoProgreso('');
+      const r = await getProgresos(id);
+      setProgresos(r.data?.data ?? []);
+    } finally { setGuardandoProg(false); }
+  };
+
+  const handleDeleteProgreso = async (progId) => {
+    await deleteProgreso(id, progId);
+    const r = await getProgresos(id);
+    setProgresos(r.data?.data ?? []);
+  };
+
+  const handleAddGasto = async () => {
+    if (!nuevoGasto.descripcion.trim() || !nuevoGasto.monto) return;
+    setGuardandoGasto(true);
+    try {
+      await addGasto(id, { descripcion: nuevoGasto.descripcion.trim(), monto: Number(nuevoGasto.monto), tipo: nuevoGasto.tipo });
+      setNuevoGasto({ descripcion: '', monto: '', tipo: 'refaccion' });
+      const r = await getGastos(id);
+      setGastos(r.data?.data ?? []);
+      setTotalGastos(r.data?.total ?? 0);
+    } finally { setGuardandoGasto(false); }
+  };
+
+  const handleDeleteGasto = async (gastoId) => {
+    await deleteGasto(id, gastoId);
+    const r = await getGastos(id);
+    setGastos(r.data?.data ?? []);
+    setTotalGastos(r.data?.total ?? 0);
+  };
+
+  const handleConvertirF3 = async () => {
+    if (!confirm('¿Convertir esta orden a Flujo 3 (reparación progresiva)? Se habilitará el registro de gastos en tiempo real.')) return;
+    setSaving(true);
+    try {
+      await updateOrdenTipoFlujo(id, 'flujo_3');
+      await cargar();
+    } catch { setError('Error al convertir a Flujo 3'); }
+    finally { setSaving(false); }
   };
 
   useEffect(() => { cargar(); }, [id]);
@@ -274,6 +341,113 @@ export default function OrdenDetallePage() {
       {/* Checklist del trabajo realizado */}
       <ChecklistSection ordenId={id} />
 
+      {/* Bitácora de progreso */}
+      {ESTADOS_TALLER.includes(estatusActual) && (
+        <div className="bg-white rounded-xl border border-[#e5e5e5] p-5 space-y-4">
+          <p className="text-[10px] text-[#9ca3af] uppercase tracking-wider font-semibold">Bitácora de progreso</p>
+
+          {progresos.length === 0 && (
+            <p className="text-sm text-[#9ca3af]">Sin registros de progreso aún.</p>
+          )}
+          <div className="space-y-2">
+            {progresos.map(p => (
+              <div key={p.id} className="flex items-start gap-3 bg-[#f9fafb] rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#111]">{p.descripcion}</p>
+                  <p className="text-[10px] text-[#9ca3af] mt-0.5">
+                    {new Date(p.created_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                {estatusActual === 'en_taller' && (
+                  <button onClick={() => handleDeleteProgreso(p.id)} className="text-[#dc2626] text-xs hover:text-red-700 shrink-0">✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {estatusActual === 'en_taller' && (
+            <div className="flex gap-2">
+              <input
+                value={nuevoProgreso}
+                onChange={e => setNuevoProgreso(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddProgreso()}
+                placeholder="Ej: Cambio de aceite completado, esperando refacción..."
+                className="flex-1 border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]"
+              />
+              <button
+                onClick={handleAddProgreso}
+                disabled={guardandoProg || !nuevoProgreso.trim()}
+                className="bg-[#1d4ed8] hover:bg-[#1e40af] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+              >
+                + Agregar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Gastos progresivos — solo Flujo 3 */}
+      {orden?.tipo_flujo === 'flujo_3' && ESTADOS_TALLER.includes(estatusActual) && (
+        <div className="bg-white rounded-xl border border-[#fed7aa] p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-[#c2410c] uppercase tracking-wider font-semibold">Gastos progresivos (Flujo 3)</p>
+            <span className="text-sm font-bold text-[#111]">Total: ${fmtMonto(totalGastos)}</span>
+          </div>
+
+          {gastos.length === 0 && <p className="text-sm text-[#9ca3af]">Sin gastos registrados.</p>}
+          <div className="space-y-2">
+            {gastos.map(g => (
+              <div key={g.id} className="flex items-center gap-3 bg-[#fff7ed] rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#111]">{g.descripcion}</p>
+                  <span className="text-[10px] text-[#9ca3af]">
+                    {g.tipo === 'refaccion' ? 'Refacción' : g.tipo === 'mano_obra' ? 'Mano de obra' : 'Otro'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-[#c2410c] shrink-0">${fmtMonto(g.monto)}</span>
+                {estatusActual === 'en_taller' && (
+                  <button onClick={() => handleDeleteGasto(g.id)} className="text-[#dc2626] text-xs shrink-0">✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {estatusActual === 'en_taller' && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <input
+                value={nuevoGasto.descripcion}
+                onChange={e => setNuevoGasto(g => ({ ...g, descripcion: e.target.value }))}
+                placeholder="Descripción"
+                className="sm:col-span-2 border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c2410c]"
+              />
+              <input
+                type="number"
+                value={nuevoGasto.monto}
+                onChange={e => setNuevoGasto(g => ({ ...g, monto: e.target.value }))}
+                placeholder="Monto $"
+                className="border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c2410c]"
+              />
+              <select
+                value={nuevoGasto.tipo}
+                onChange={e => setNuevoGasto(g => ({ ...g, tipo: e.target.value }))}
+                className="border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none"
+              >
+                <option value="refaccion">Refacción</option>
+                <option value="mano_obra">Mano de obra</option>
+                <option value="otro">Otro</option>
+              </select>
+              <button
+                onClick={handleAddGasto}
+                disabled={guardandoGasto || !nuevoGasto.descripcion.trim() || !nuevoGasto.monto}
+                className="sm:col-span-4 bg-[#c2410c] hover:bg-[#9a3412] disabled:opacity-50 text-white py-2 rounded-lg text-sm font-semibold"
+              >
+                + Agregar gasto
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Acciones según estatus */}
       <div className="bg-white rounded-xl border border-[#e5e5e5] p-5">
         <p className="text-[10px] text-[#9ca3af] uppercase tracking-wider font-semibold mb-4">Acciones</p>
@@ -338,13 +512,59 @@ export default function OrdenDetallePage() {
         )}
 
         {estatusActual === 'en_taller' && (
-          <button
-            onClick={() => avanzarEstatus('listo_entrega')}
-            disabled={saving}
-            className="bg-[#059669] hover:bg-[#047857] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-semibold"
-          >
-            {saving ? 'Actualizando...' : 'Marcar listo'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => avanzarEstatus('listo_entrega')}
+              disabled={saving}
+              className="bg-[#059669] hover:bg-[#047857] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+            >
+              {saving ? 'Actualizando...' : 'Marcar listo'}
+            </button>
+            {orden?.tipo_flujo !== 'flujo_3' ? (
+              <button
+                onClick={handleConvertirF3}
+                disabled={saving}
+                className="border border-[#fed7aa] bg-[#fff7ed] text-[#c2410c] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#ffedd5] disabled:opacity-50"
+              >
+                ↗ Convertir a Flujo 3
+              </button>
+            ) : (
+              <button
+                onClick={() => avanzarEstatus('pausado_consulta')}
+                disabled={saving}
+                className="bg-[#dc2626] hover:bg-[#b91c1c] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+              >
+                {saving ? '...' : '⚠ Problema mayor — consultar cliente'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {estatusActual === 'pausado_consulta' && (
+          <div className="space-y-3">
+            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-lg px-4 py-3">
+              <p className="text-sm font-semibold text-[#dc2626] mb-1">⚠ Orden pausada — esperando decisión del cliente</p>
+              <p className="text-xs text-[#374151]">
+                Gastos acumulados: <strong>${fmtMonto(totalGastos)}</strong>
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => avanzarEstatus('en_taller')}
+                disabled={saving}
+                className="bg-[#1d4ed8] hover:bg-[#1e40af] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+              >
+                {saving ? '...' : '✓ Cliente aprobó — continuar trabajo'}
+              </button>
+              <button
+                onClick={() => avanzarEstatus('listo_entrega')}
+                disabled={saving}
+                className="bg-[#059669] hover:bg-[#047857] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+              >
+                {saving ? '...' : '✓ Cliente pidió cerrar — ir a entrega'}
+              </button>
+            </div>
+          </div>
         )}
 
         {estatusActual === 'listo_entrega' && (

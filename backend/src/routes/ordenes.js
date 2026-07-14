@@ -167,15 +167,17 @@ router.put('/:id', (req, res) => {
   const ot = db.prepare('SELECT * FROM ordenes_trabajo WHERE id = ?').get(req.params.id);
   if (!ot) return res.status(404).json({ error: 'Orden no encontrada' });
 
-  const { costo_real, precio_real } = req.body;
+  const { costo_real, precio_real, tipo_flujo } = req.body;
+  const tipoFlujoVal = ['flujo_1', 'flujo_2', 'flujo_3'].includes(tipo_flujo) ? tipo_flujo : ot.tipo_flujo;
 
   db.prepare(`
     UPDATE ordenes_trabajo
-    SET costo_real = ?, precio_real = ?, updated_at = datetime('now')
+    SET costo_real = ?, precio_real = ?, tipo_flujo = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(
     costo_real !== undefined ? costo_real : ot.costo_real,
     precio_real !== undefined ? precio_real : ot.precio_real,
+    tipoFlujoVal,
     req.params.id,
   );
 
