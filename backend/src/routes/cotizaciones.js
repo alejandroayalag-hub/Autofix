@@ -47,11 +47,11 @@ router.post('/', (req, res) => {
   const cotId = r.lastInsertRowid;
   const insItem = db.prepare(
     `INSERT INTO cotizacion_items
-     (cotizacion_id, paquete_id, descripcion, cantidad, costo_unitario, precio_unitario, subtotal_costo, subtotal_precio)
-     VALUES (?,?,?,?,?,?,?,?)`
+     (cotizacion_id, paquete_id, actividad, descripcion, cantidad, costo_unitario, precio_unitario, subtotal_costo, subtotal_precio)
+     VALUES (?,?,?,?,?,?,?,?,?)`
   );
   for (const it of items) {
-    insItem.run(cotId, it.paquete_id || null, it.descripcion,
+    insItem.run(cotId, it.paquete_id || null, it.actividad || null, it.descripcion,
       it.cantidad || 1, it.costo_unitario || 0, it.precio_unitario || 0,
       it.subtotal_costo || 0, it.subtotal_precio || 0);
   }
@@ -75,11 +75,11 @@ router.put('/:id', (req, res) => {
   db.prepare('DELETE FROM cotizacion_items WHERE cotizacion_id=?').run(req.params.id);
   const insItem = db.prepare(
     `INSERT INTO cotizacion_items
-     (cotizacion_id, paquete_id, descripcion, cantidad, costo_unitario, precio_unitario, subtotal_costo, subtotal_precio)
-     VALUES (?,?,?,?,?,?,?,?)`
+     (cotizacion_id, paquete_id, actividad, descripcion, cantidad, costo_unitario, precio_unitario, subtotal_costo, subtotal_precio)
+     VALUES (?,?,?,?,?,?,?,?,?)`
   );
   for (const it of items) {
-    insItem.run(req.params.id, it.paquete_id || null, it.descripcion,
+    insItem.run(req.params.id, it.paquete_id || null, it.actividad || null, it.descripcion,
       it.cantidad || 1, it.costo_unitario || 0, it.precio_unitario || 0,
       it.subtotal_costo || 0, it.subtotal_precio || 0);
   }

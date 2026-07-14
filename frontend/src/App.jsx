@@ -5,7 +5,7 @@ import LoginPage from './pages/LoginPage';
 import BitacoraPage from './pages/BitacoraPage';
 import ServicioFormPage from './pages/ServicioFormPage';
 import ClientesPage from './pages/ClientesPage';
-import PaquetesPage from './pages/PaquetesPage';
+import CatalogoArmadoPage from './pages/CatalogoArmadoPage';
 import CotizacionesPage from './pages/CotizacionesPage';
 import CotizacionFormPage from './pages/CotizacionFormPage';
 import FinancieroPage from './pages/FinancieroPage';
@@ -32,7 +32,7 @@ function Layout() {
             <Route path="/servicios/nuevo" element={<ServicioFormPage />} />
             <Route path="/servicios/:id/editar" element={<ServicioFormPage />} />
             <Route path="/clientes" element={<ClientesPage />} />
-            <Route path="/paquetes" element={<PaquetesPage />} />
+            <Route path="/paquetes" element={<CatalogoArmadoPage />} />
             <Route path="/cotizaciones" element={<CotizacionesPage />} />
             <Route path="/cotizaciones/nueva" element={<CotizacionFormPage />} />
             <Route path="/cotizaciones/:id/editar" element={<CotizacionFormPage />} />

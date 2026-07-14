@@ -27,6 +27,7 @@ app.use('/api/cotizaciones',  auth, require('./routes/cotizaciones'));
 app.use('/api/ordenes',       auth, require('./routes/ordenes'));
 app.use('/api/financiero',    auth, require('./routes/financiero'));
 app.use('/api/catalogo',     auth, require('./routes/catalogo'));
+app.use('/api/actividades',  auth, require('./routes/actividades'));
 app.use('/api/ordenes/:id/frenos', auth, require('./routes/diagnostico_frenos'));
 app.use('/api/ordenes/:id/progresos', auth, require('./routes/progresos'));
 app.use('/api/ordenes/:id/gastos',    auth, require('./routes/gastos'));

@@ -4,15 +4,47 @@ import { getCotizacion, createCotizacion, updateCotizacion } from '../api/cotiza
 import { getCatalogo } from '../api/catalogo';
 import { getClientes } from '../api/clientes';
 import { getAutos } from '../api/autos';
+import { getPaquetesCompuestos, getPaqueteArbol } from '../api/paquetes';
 
 const ESTATUS = ['borrador','enviada','aprobada','rechazada'];
 
 const emptyItem = () => ({
   _key: Math.random(),
-  paquete_id: '', descripcion: '', cantidad: 1,
+  paquete_id: '', actividad: '', descripcion: '', cantidad: 1,
   costo_unitario: 0, precio_unitario: 0,
   subtotal_costo: 0, subtotal_precio: 0,
 });
+
+/* Convierte el árbol de un paquete (actividades → insumos + mano de obra) en líneas de cotización */
+const itemsDesdeArbol = (paq) => {
+  const lineas = [];
+  for (const a of paq.actividades) {
+    for (const ins of a.insumos) {
+      const cant = ins.config_default || 1;
+      lineas.push({
+        _key: Math.random(), paquete_id: '', actividad: a.nombre,
+        descripcion: `${ins.nombre}${ins.unidad ? ` (${ins.unidad})` : ''}`,
+        cantidad: cant,
+        costo_unitario: ins.costo_unitario || 0,
+        precio_unitario: ins.precio_unitario || 0,
+        subtotal_costo: cant * (ins.costo_unitario || 0),
+        subtotal_precio: cant * (ins.precio_unitario || 0),
+      });
+    }
+    if ((a.horas_mano_obra || 0) > 0) {
+      lineas.push({
+        _key: Math.random(), paquete_id: '', actividad: a.nombre,
+        descripcion: 'Mano de obra (hrs)',
+        cantidad: a.horas_mano_obra,
+        costo_unitario: 0,
+        precio_unitario: a.tarifa_hora || 0,
+        subtotal_costo: 0,
+        subtotal_precio: (a.horas_mano_obra || 0) * (a.tarifa_hora || 0),
+      });
+    }
+  }
+  return lineas;
+};
 
 const fmtMXN = v => `$${Number(v || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 
@@ -29,6 +61,8 @@ export default function CotizacionFormPage() {
   const [catalogoItems, setCatalogoItems] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [autos, setAutos] = useState([]);
+  const [paquetes, setPaquetes] = useState([]);
+  const [paqueteId, setPaqueteId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,6 +70,7 @@ export default function CotizacionFormPage() {
     getCatalogo().then(data => setCatalogoItems(data));
     getClientes().then(data => setClientes(data));
     getAutos().then(r => setAutos(r.data?.data ?? []));
+    getPaquetesCompuestos().then(r => setPaquetes(r.data?.data ?? []));
     if (isEdit) {
       getCotizacion(id).then(r => {
         const c = r.data;
@@ -97,6 +132,19 @@ export default function CotizacionFormPage() {
       }
       return updated;
     }));
+  };
+
+  const handlePaquete = async e => {
+    const pid = e.target.value;
+    setPaqueteId(pid);
+    if (!pid) return;
+    const hayCaptura = items.some(i => i.descripcion?.trim());
+    if (hayCaptura && !confirm('Cargar el paquete reemplaza las líneas actuales. ¿Continuar?')) {
+      setPaqueteId(''); return;
+    }
+    const r = await getPaqueteArbol(pid);
+    const lineas = itemsDesdeArbol(r.data.data);
+    setItems(lineas.length ? lineas : [emptyItem()]);
   };
 
   const addItem  = () => setItems(prev => [...prev, emptyItem()]);
@@ -216,15 +264,25 @@ export default function CotizacionFormPage() {
 
         {/* Ítems */}
         <div className="bg-white rounded-xl border border-[#e5e5e5] p-5">
-          <div className="flex items-center justify-between mb-4 border-b pb-2">
+          <div className="flex items-center justify-between mb-4 border-b pb-2 gap-3 flex-wrap">
             <h2 className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Servicios / Ítems</h2>
-            <button type="button" onClick={addItem}
-              className="text-[#1d4ed8] hover:text-[#1e40af] text-sm font-semibold">+ Agregar</button>
+            <div className="flex items-center gap-3">
+              {paquetes.length > 0 && (
+                <select value={paqueteId} onChange={handlePaquete}
+                  className="border border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]">
+                  <option value="">⚡ Cargar paquete…</option>
+                  {paquetes.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+              )}
+              <button type="button" onClick={addItem}
+                className="text-[#1d4ed8] hover:text-[#1e40af] text-sm font-semibold">+ Agregar</button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[#9ca3af] text-xs" style={{ background: '#111111' }}>
                 <tr>
+                  <th className="text-left px-2 py-2 w-32">Actividad</th>
                   <th className="text-left px-2 py-2">Paquete (opcional)</th>
                   <th className="text-left px-2 py-2">Descripción *</th>
                   <th className="text-center px-2 py-2 w-16">Cant.</th>
@@ -237,6 +295,10 @@ export default function CotizacionFormPage() {
               <tbody className="divide-y divide-[#f3f4f6]">
                 {items.map(it => (
                   <tr key={it._key}>
+                    <td className="px-2 py-2">
+                      <input value={it.actividad || ''} onChange={e => handleItem(it._key, 'actividad', e.target.value)}
+                        placeholder="—" className="w-full border border-[#e5e5e5] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d4ed8]" />
+                    </td>
                     <td className="px-2 py-2">
                       <select value={it.paquete_id || ''} onChange={e => handleItem(it._key, 'paquete_id', e.target.value)}
                         className="w-full border border-[#e5e5e5] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d4ed8]">
@@ -292,7 +354,7 @@ export default function CotizacionFormPage() {
               </tbody>
               <tfoot className="border-t-2 border-[#e5e5e5] bg-[#fafafa] text-sm font-semibold">
                 <tr>
-                  <td colSpan={4} className="px-2 py-3 text-right text-[#6b7280] text-xs">
+                  <td colSpan={5} className="px-2 py-3 text-right text-[#6b7280] text-xs">
                     Costo total: <span className="text-[#374151]">{fmtMXN(total_costo)}</span>
                   </td>
                   <td className="px-2 py-3 text-right text-[#374151]">Total precio:</td>
@@ -300,7 +362,7 @@ export default function CotizacionFormPage() {
                   <td></td>
                 </tr>
                 <tr>
-                  <td colSpan={5} className="px-2 pb-2 text-right text-[#6b7280] text-xs">Utilidad estimada:</td>
+                  <td colSpan={6} className="px-2 pb-2 text-right text-[#6b7280] text-xs">Utilidad estimada:</td>
                   <td className={`px-2 pb-2 text-right font-bold ${utilidad >= 0 ? 'text-[#059669]' : 'text-[#dc2626]'}`}>
                     {fmtMXN(utilidad)}
                   </td>

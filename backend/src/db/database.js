@@ -159,4 +159,47 @@ sql010.forEach(stmt => {
   }
 });
 
+// Migración 011 — paquete → actividades → insumos
+const sql011 = fs.readFileSync(path.join(__dirname, 'migrations', '011_paquetes_actividades.sql'), 'utf8')
+  .split(';').map(s => s.trim()).filter(s => s.length > 0);
+sql011.forEach(stmt => {
+  try { db.exec(stmt); } catch (e) {
+    if (!e.message.includes('duplicate column name') && !e.message.includes('already exists')) throw e;
+  }
+});
+
+// Datos 011: convertir tipo_servicio existentes en actividades y ligar insumos
+if (db.prepare('SELECT COUNT(*) n FROM actividades').get().n === 0) {
+  const NOMBRES = {
+    cambio_aceite: 'Cambio de aceite', afinacion: 'Afinación',
+    escaneo: 'Escaneo / Diagnóstico', frenos: 'Frenos', reparacion: 'Reparación',
+  };
+  const tipos = db.prepare('SELECT DISTINCT tipo_servicio FROM catalogo_items').all();
+  const ins = db.prepare('INSERT INTO actividades (nombre) VALUES (?)');
+  const link = db.prepare('UPDATE catalogo_items SET actividad_id = ? WHERE tipo_servicio = ?');
+  for (const { tipo_servicio } of tipos) {
+    const r = ins.run(NOMBRES[tipo_servicio] || tipo_servicio);
+    link.run(r.lastInsertRowid, tipo_servicio);
+  }
+  console.log(`011: ${tipos.length} actividades creadas desde catalogo_items`);
+}
+
+// 011: dedupe de catalogo_items (la seed 006 se re-insertaba en cada arranque) + índice único
+db.prepare(`DELETE FROM catalogo_items WHERE id NOT IN (
+  SELECT MIN(id) FROM catalogo_items GROUP BY tipo_servicio, nombre
+)`).run();
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_catalogo_tipo_nombre ON catalogo_items(tipo_servicio, nombre)');
+
+// 011: relink idempotente — insumos seed sin actividad se ligan a la actividad de su tipo_servicio
+db.prepare(`
+  UPDATE catalogo_items SET actividad_id = (
+    SELECT a.id FROM actividades a
+    JOIN (SELECT 'cambio_aceite' ts, 'Cambio de aceite' n UNION SELECT 'afinacion','Afinación'
+          UNION SELECT 'escaneo','Escaneo / Diagnóstico' UNION SELECT 'frenos','Frenos'
+          UNION SELECT 'reparacion','Reparación') m ON m.n = a.nombre
+    WHERE m.ts = catalogo_items.tipo_servicio
+  )
+  WHERE actividad_id IS NULL AND tipo_servicio NOT LIKE 'act_%'
+`).run();
+
 module.exports = db;
