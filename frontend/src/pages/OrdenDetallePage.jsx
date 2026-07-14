@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getOrden, updateOrdenEstatus } from '../api/ordenes';
+import { getChecklist, addChecklistItem, toggleChecklistItem, deleteChecklistItem } from '../api/checklist';
 
 const ESTATUS_STYLE = {
   en_cotizacion:    { bg: '#eff6ff', text: '#1d4ed8',  label: 'En cotización' },
@@ -50,6 +51,75 @@ const fmtFecha = (iso) => {
   const d = new Date(iso);
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 };
+
+/* ── Checklist del trabajo realizado ──────────────────────────── */
+function ChecklistSection({ ordenId }) {
+  const [items, setItems] = useState([]);
+  const [nuevo, setNuevo] = useState('');
+
+  const cargar = () => getChecklist(ordenId).then(r => setItems(r.data?.data ?? []));
+  useEffect(() => { cargar(); }, [ordenId]);
+
+  const agregar = async () => {
+    if (!nuevo.trim()) return;
+    await addChecklistItem(ordenId, nuevo);
+    setNuevo(''); cargar();
+  };
+
+  const toggle = async (it) => {
+    await toggleChecklistItem(ordenId, it.id, !it.hecho);
+    cargar();
+  };
+
+  const borrar = async (it) => {
+    await deleteChecklistItem(ordenId, it.id);
+    cargar();
+  };
+
+  const hechos = items.filter(i => i.hecho).length;
+
+  return (
+    <div className="bg-white rounded-xl border border-[#e5e5e5] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-[10px] text-[#9ca3af] uppercase tracking-wider font-semibold">Checklist del trabajo</p>
+        {items.length > 0 && (
+          <span className={`text-xs font-semibold ${hechos === items.length ? 'text-[#059669]' : 'text-[#6b7280]'}`}>
+            {hechos}/{items.length} completado{hechos !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {items.length === 0 && (
+        <p className="text-sm text-[#9ca3af] mb-3">Sin items — agrega los trabajos a realizar</p>
+      )}
+
+      <div className="space-y-1.5 mb-3">
+        {items.map(it => (
+          <div key={it.id} className="flex items-center gap-3 group">
+            <input type="checkbox" checked={!!it.hecho} onChange={() => toggle(it)}
+              className="w-4 h-4 accent-[#059669] cursor-pointer shrink-0" />
+            <span className={`text-sm flex-1 ${it.hecho ? 'line-through text-[#9ca3af]' : 'text-[#111]'}`}>
+              {it.descripcion}
+            </span>
+            <button onClick={() => borrar(it)}
+              className="text-[#dc2626] text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input value={nuevo} onChange={e => setNuevo(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && agregar()}
+          placeholder="Agregar trabajo… (Enter)"
+          className="flex-1 border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+        <button onClick={agregar}
+          className="bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#dbeafe]">
+          Agregar
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const InfoRow = ({ label, value }) => (
   <div>
@@ -200,6 +270,9 @@ export default function OrdenDetallePage() {
           </div>
         )}
       </div>
+
+      {/* Checklist del trabajo realizado */}
+      <ChecklistSection ordenId={id} />
 
       {/* Acciones según estatus */}
       <div className="bg-white rounded-xl border border-[#e5e5e5] p-5">

@@ -150,4 +150,13 @@ sql009.forEach(stmt => {
   }
 });
 
+// Migración 010 — flujo completo (auto_id en cotizaciones, checklist, pago remisión)
+const sql010 = fs.readFileSync(path.join(__dirname, 'migrations', '010_flujo_completo.sql'), 'utf8')
+  .split(';').map(s => s.trim()).filter(s => s.length > 0);
+sql010.forEach(stmt => {
+  try { db.exec(stmt); } catch (e) {
+    if (!e.message.includes('duplicate column name') && !e.message.includes('already exists')) throw e;
+  }
+});
+
 module.exports = db;

@@ -1,0 +1,10 @@
+ALTER TABLE clientes ADD COLUMN rfc TEXT;
+ALTER TABLE clientes ADD COLUMN razon_social TEXT;
+ALTER TABLE clientes ADD COLUMN calle_numero TEXT;
+ALTER TABLE clientes ADD COLUMN colonia TEXT;
+ALTER TABLE clientes ADD COLUMN codigo_postal TEXT;
+ALTER TABLE clientes ADD COLUMN correo_facturacion TEXT;
+ALTER TABLE clientes ADD COLUMN regimen_fiscal TEXT;
+ALTER TABLE clientes ADD COLUMN nombre_contacto TEXT;
+ALTER TABLE clientes ADD COLUMN telefono_contacto TEXT;
+ALTER TABLE clientes ADD COLUMN csf_pdf TEXT;

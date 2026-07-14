@@ -16,6 +16,7 @@ import OrdenDetallePage from './pages/OrdenDetallePage';
 import OrdenDiagnosticoPage from './pages/OrdenDiagnosticoPage';
 import OrdenCotizacionPage from './pages/OrdenCotizacionPage';
 import OrdenCierrePage from './pages/OrdenCierrePage';
+import OrdenSalidaPage from './pages/OrdenSalidaPage';
 import CotizacionPublicaPage from './pages/CotizacionPublicaPage';
 import PipelinePage from './pages/PipelinePage';
 
@@ -43,6 +44,7 @@ function Layout() {
             <Route path="/ordenes/:id/diagnostico" element={<OrdenDiagnosticoPage />} />
             <Route path="/ordenes/:id/cotizacion" element={<OrdenCotizacionPage />} />
             <Route path="/ordenes/:id/cierre" element={<OrdenCierrePage />} />
+            <Route path="/ordenes/:id/salida" element={<OrdenSalidaPage />} />
             <Route path="/inventario" element={<div className="p-8 text-center text-[#6b7280]"><p className="text-2xl mb-2">🔧</p><p className="font-semibold text-[#111]">Inventario</p><p className="text-sm mt-1">Próximamente</p></div>} />
             <Route path="/cultura" element={<div className="p-8 text-center text-[#6b7280]"><p className="text-2xl mb-2">🏢</p><p className="font-semibold text-[#111]">Cultura empresarial</p><p className="text-sm mt-1">Próximamente</p></div>} />
           </Routes>

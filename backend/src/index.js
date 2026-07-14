@@ -30,6 +30,8 @@ app.use('/api/catalogo',     auth, require('./routes/catalogo'));
 app.use('/api/ordenes/:id/frenos', auth, require('./routes/diagnostico_frenos'));
 app.use('/api/ordenes/:id/progresos', auth, require('./routes/progresos'));
 app.use('/api/ordenes/:id/gastos',    auth, require('./routes/gastos'));
+app.use('/api/ordenes/:id/checklist', auth, require('./routes/checklist'));
+app.use('/api/ordenes/:id/remision',  auth, require('./routes/remisiones'));
 
 // Servir frontend en producción
 const distPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
