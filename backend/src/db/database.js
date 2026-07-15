@@ -217,4 +217,18 @@ if (sinNumero.length > 0) {
   console.log(`012: ${sinNumero.length} clientes numerados`);
 }
 
+// Migración 013 — número de auto automático (A-0001, A-0002, …)
+try { db.exec('ALTER TABLE autos ADD COLUMN numero_auto TEXT'); } catch (e) {
+  if (!e.message.includes('duplicate column name')) throw e;
+}
+const autosSinNumero = db.prepare('SELECT id FROM autos WHERE numero_auto IS NULL ORDER BY id').all();
+if (autosSinNumero.length > 0) {
+  let sig = (db.prepare(
+    "SELECT MAX(CAST(SUBSTR(numero_auto, 3) AS INTEGER)) m FROM autos WHERE numero_auto LIKE 'A-%'"
+  ).get().m || 0) + 1;
+  const upd = db.prepare('UPDATE autos SET numero_auto = ? WHERE id = ?');
+  for (const { id } of autosSinNumero) upd.run(`A-${String(sig++).padStart(4, '0')}`, id);
+  console.log(`013: ${autosSinNumero.length} autos numerados`);
+}
+
 module.exports = db;

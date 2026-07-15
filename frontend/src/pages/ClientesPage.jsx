@@ -95,6 +95,7 @@ function ClienteCard({ c, autos, onEditar, onEliminar, onAgregarAuto }) {
                 {autos.map(a => (
                   <div key={a.id} className="flex items-center gap-3 bg-[#f9fafb] border border-[#f3f4f6] rounded-lg px-3 py-2 text-sm">
                     <span>🚗</span>
+                    {a.numero_auto && <span className="font-mono text-xs font-bold text-[#1d4ed8]">{a.numero_auto}</span>}
                     <span className="font-mono font-semibold text-[#111]">{a.placa || 'S/P'}</span>
                     <span className="text-[#374151]">{[a.marca, a.modelo, a.anio].filter(Boolean).join(' ')}</span>
                     {a.color && <span className="text-[#9ca3af] text-xs">{a.color}</span>}

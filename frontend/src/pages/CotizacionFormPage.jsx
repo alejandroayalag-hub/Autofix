@@ -263,7 +263,7 @@ export default function CotizacionFormPage() {
                 <option value="">{form.cliente_id ? 'Seleccionar auto…' : 'Primero elige cliente'}</option>
                 {autosDelCliente.map(a => (
                   <option key={a.id} value={a.id}>
-                    {[a.placa || 'S/P', a.marca, a.modelo, a.anio].filter(Boolean).join(' — ')}
+                    {[a.numero_auto, a.placa || 'S/P', a.marca, a.modelo, a.anio].filter(Boolean).join(' — ')}
                   </option>
                 ))}
               </select>

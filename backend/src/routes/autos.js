@@ -108,11 +108,12 @@ router.post('/', upload.fields(FOTO_FIELDS), (req, res) => {
 
   const result = db.prepare(`
     INSERT INTO autos
-      (cliente_id, placa, marca, modelo, anio, motor, vin, color, notas,
+      (numero_auto, cliente_id, placa, marca, modelo, anio, motor, vin, color, notas,
        foto_vin, foto_frente, foto_lateral_der, foto_lateral_izq, foto_trasero,
        fotos_danos, notas_danos)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
+    `A-${String((db.prepare("SELECT MAX(CAST(SUBSTR(numero_auto, 3) AS INTEGER)) m FROM autos WHERE numero_auto LIKE 'A-%'").get().m || 0) + 1).padStart(4, '0')}`,
     cliente_id || null,
     placaNorm,
     marca || null,

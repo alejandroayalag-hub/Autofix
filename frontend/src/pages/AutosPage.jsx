@@ -94,6 +94,9 @@ function AutoCard({ auto, nombreCliente, onEditar, onEliminar }) {
         onClick={() => setAbierto(a => !a)}
       >
         <div className="flex items-center gap-3 min-w-0">
+          {auto.numero_auto && (
+            <span className="font-mono text-xs font-bold text-[#1d4ed8] shrink-0">{auto.numero_auto}</span>
+          )}
           {/* Placa */}
           <span className="bg-[#111] text-white text-xs font-bold px-2.5 py-1 rounded-md tracking-wider shrink-0">
             {auto.placa ?? '—'}
