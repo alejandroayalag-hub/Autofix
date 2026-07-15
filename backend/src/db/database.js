@@ -202,4 +202,19 @@ db.prepare(`
   WHERE actividad_id IS NULL AND tipo_servicio NOT LIKE 'act_%'
 `).run();
 
+// Migración 012 — número de cliente automático (C-0001, C-0002, …)
+try { db.exec('ALTER TABLE clientes ADD COLUMN numero_cliente TEXT'); } catch (e) {
+  if (!e.message.includes('duplicate column name')) throw e;
+}
+// Backfill idempotente por orden de alta
+const sinNumero = db.prepare('SELECT id FROM clientes WHERE numero_cliente IS NULL ORDER BY id').all();
+if (sinNumero.length > 0) {
+  let sig = (db.prepare(
+    "SELECT MAX(CAST(SUBSTR(numero_cliente, 3) AS INTEGER)) m FROM clientes WHERE numero_cliente LIKE 'C-%'"
+  ).get().m || 0) + 1;
+  const upd = db.prepare('UPDATE clientes SET numero_cliente = ? WHERE id = ?');
+  for (const { id } of sinNumero) upd.run(`C-${String(sig++).padStart(4, '0')}`, id);
+  console.log(`012: ${sinNumero.length} clientes numerados`);
+}
+
 module.exports = db;

@@ -243,7 +243,11 @@ export default function CotizacionFormPage() {
               <select value={form.cliente_id} onChange={handleClienteChange}
                 className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]">
                 <option value="">Seleccionar cliente…</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.numero_cliente ? `${c.numero_cliente} — ` : ''}{c.nombre}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

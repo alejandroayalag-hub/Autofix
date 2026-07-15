@@ -54,7 +54,10 @@ function ClienteCard({ c, autos, onEditar, onEliminar, onAgregarAuto }) {
             <span className="text-[#1d4ed8] text-xs font-bold">{(c.nombre?.[0] ?? '?').toUpperCase()}</span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#111] truncate">{c.nombre}</p>
+            <p className="text-sm font-semibold text-[#111] truncate">
+              {c.numero_cliente && <span className="font-mono text-[#1d4ed8] mr-1.5">{c.numero_cliente}</span>}
+              {c.nombre}
+            </p>
             {c.razon_social && <p className="text-[11px] text-[#6b7280] truncate">{c.razon_social}</p>}
             {!c.razon_social && datosContacto && <p className="text-[11px] text-[#9ca3af] truncate">{datosContacto}</p>}
           </div>
@@ -207,7 +210,8 @@ export default function ClientesPage() {
     ? clientes.filter(c => {
         const q = busqueda.trim().toLowerCase();
         return (c.nombre ?? '').toLowerCase().includes(q)
-          || (c.razon_social ?? '').toLowerCase().includes(q);
+          || (c.razon_social ?? '').toLowerCase().includes(q)
+          || (c.numero_cliente ?? '').toLowerCase().includes(q);
       })
     : clientes;
 

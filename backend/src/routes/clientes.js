@@ -48,13 +48,17 @@ router.post('/', upload.single('csf_pdf'), (req, res) => {
   const { nombre, ...rest } = pickCampos(req.body);
   if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
   const csf_pdf = req.file ? `/uploads/clientes/${req.file.filename}` : null;
+  const sig = (db.prepare(
+    "SELECT MAX(CAST(SUBSTR(numero_cliente, 3) AS INTEGER)) m FROM clientes WHERE numero_cliente LIKE 'C-%'"
+  ).get().m || 0) + 1;
+  const numeroCliente = `C-${String(sig).padStart(4, '0')}`;
   const result = db.prepare(`
     INSERT INTO clientes
-      (nombre, telefono, email, notas, rfc, razon_social, calle_numero, colonia,
+      (numero_cliente, nombre, telefono, email, notas, rfc, razon_social, calle_numero, colonia,
        codigo_postal, correo_facturacion, regimen_fiscal, nombre_contacto, telefono_contacto, csf_pdf)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    nombre, rest.telefono, rest.email, rest.notas,
+    numeroCliente, nombre, rest.telefono, rest.email, rest.notas,
     rest.rfc, rest.razon_social, rest.calle_numero, rest.colonia,
     rest.codigo_postal, rest.correo_facturacion, rest.regimen_fiscal,
     rest.nombre_contacto, rest.telefono_contacto, csf_pdf
