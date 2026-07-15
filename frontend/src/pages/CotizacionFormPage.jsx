@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCotizacion, createCotizacion, updateCotizacion } from '../api/cotizaciones';
 import { getCatalogo } from '../api/catalogo';
-import { getClientes } from '../api/clientes';
-import { getAutos } from '../api/autos';
+import { getClientes, crearCliente } from '../api/clientes';
+import { getAutos, createAuto } from '../api/autos';
 import { getPaquetesCompuestos, getPaqueteArbol } from '../api/paquetes';
 
 const ESTATUS = ['borrador','enviada','aprobada','rechazada'];
@@ -65,6 +65,46 @@ export default function CotizacionFormPage() {
   const [paqueteId, setPaqueteId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Altas rápidas desde el cotizador
+  const [modalCliente, setModalCliente] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', telefono: '', email: '' });
+  const [modalAuto, setModalAuto] = useState(false);
+  const [nuevoAuto, setNuevoAuto] = useState({ placa: '', marca: '', modelo: '', anio: '' });
+  const [guardandoAlta, setGuardandoAlta] = useState(false);
+  const [errorAlta, setErrorAlta] = useState('');
+
+  const handleCrearCliente = async () => {
+    if (!nuevoCliente.nombre.trim()) { setErrorAlta('El nombre es requerido'); return; }
+    setErrorAlta(''); setGuardandoAlta(true);
+    try {
+      const creado = await crearCliente(nuevoCliente);
+      setClientes(prev => [...prev, creado]);
+      setForm(f => ({ ...f, cliente_id: String(creado.id), cliente_nombre: creado.nombre, auto_id: '' }));
+      setModalCliente(false);
+      setNuevoCliente({ nombre: '', telefono: '', email: '' });
+    } catch (err) {
+      setErrorAlta(err.response?.data?.error || 'Error al crear cliente');
+    } finally { setGuardandoAlta(false); }
+  };
+
+  const handleCrearAuto = async () => {
+    if (!nuevoAuto.placa.trim()) { setErrorAlta('La placa es requerida'); return; }
+    setErrorAlta(''); setGuardandoAlta(true);
+    try {
+      const res = await createAuto({ ...nuevoAuto, cliente_id: form.cliente_id });
+      const creado = res.data?.data ?? res.data;
+      setAutos(prev => [...prev, creado]);
+      setForm(f => ({
+        ...f, auto_id: String(creado.id),
+        placa: creado.placa || '', marca: creado.marca || '', modelo: creado.modelo || '', anio: creado.anio || '',
+      }));
+      setModalAuto(false);
+      setNuevoAuto({ placa: '', marca: '', modelo: '', anio: '' });
+    } catch (err) {
+      setErrorAlta(err.response?.data?.error || 'Error al crear auto');
+    } finally { setGuardandoAlta(false); }
+  };
 
   useEffect(() => {
     getCatalogo().then(data => setCatalogoItems(data));
@@ -195,7 +235,11 @@ export default function CotizacionFormPage() {
           <h2 className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider mb-4">Cliente y auto</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">Cliente *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-[#6b7280]">Cliente *</label>
+                <button type="button" onClick={() => { setErrorAlta(''); setModalCliente(true); }}
+                  className="text-[10px] text-[#1d4ed8] hover:underline font-semibold">+ Agregar cliente</button>
+              </div>
               <select value={form.cliente_id} onChange={handleClienteChange}
                 className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]">
                 <option value="">Seleccionar cliente…</option>
@@ -203,7 +247,13 @@ export default function CotizacionFormPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-[#6b7280] mb-1">Auto del cliente</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-[#6b7280]">Auto del cliente</label>
+                {form.cliente_id && (
+                  <button type="button" onClick={() => { setErrorAlta(''); setModalAuto(true); }}
+                    className="text-[10px] text-[#1d4ed8] hover:underline font-semibold">+ Agregar auto</button>
+                )}
+              </div>
               <select value={form.auto_id} onChange={handleAutoChange} disabled={!form.cliente_id}
                 className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
                 <option value="">{form.cliente_id ? 'Seleccionar auto…' : 'Primero elige cliente'}</option>
@@ -215,9 +265,9 @@ export default function CotizacionFormPage() {
               </select>
               {form.cliente_id && autosDelCliente.length === 0 && (
                 <p className="text-[11px] text-[#9ca3af] mt-1">
-                  Este cliente no tiene autos.{' '}
-                  <button type="button" onClick={() => navigate(`/autos?nuevo=1&cliente_id=${form.cliente_id}`)}
-                    className="text-[#1d4ed8] hover:underline">Registrar auto</button>
+                  Este cliente no tiene autos —{' '}
+                  <button type="button" onClick={() => { setErrorAlta(''); setModalAuto(true); }}
+                    className="text-[#1d4ed8] hover:underline">agregar auto</button>
                 </p>
               )}
             </div>
@@ -385,6 +435,59 @@ export default function CotizacionFormPage() {
           </button>
         </div>
       </form>
+
+      {/* Modal alta rápida de cliente */}
+      {modalCliente && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-5 w-full max-w-sm space-y-3">
+            <h3 className="text-sm font-bold text-[#111]">Nuevo cliente</h3>
+            <input autoFocus value={nuevoCliente.nombre} onChange={e => setNuevoCliente(v => ({ ...v, nombre: e.target.value }))}
+              placeholder="Nombre *" className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+            <input value={nuevoCliente.telefono} onChange={e => setNuevoCliente(v => ({ ...v, telefono: e.target.value }))}
+              placeholder="Teléfono" className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+            <input value={nuevoCliente.email} onChange={e => setNuevoCliente(v => ({ ...v, email: e.target.value }))}
+              placeholder="Email" type="email" className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+            {errorAlta && <p className="text-[#dc2626] text-xs">{errorAlta}</p>}
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setModalCliente(false)}
+                className="bg-white border border-[#e5e5e5] text-[#374151] px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+              <button type="button" onClick={handleCrearCliente} disabled={guardandoAlta}
+                className="bg-[#1d4ed8] hover:bg-[#1e40af] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                {guardandoAlta ? 'Guardando…' : 'Guardar cliente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alta rápida de auto */}
+      {modalAuto && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-5 w-full max-w-sm space-y-3">
+            <h3 className="text-sm font-bold text-[#111]">Nuevo auto de {form.cliente_nombre || 'cliente'}</h3>
+            <input autoFocus value={nuevoAuto.placa} onChange={e => setNuevoAuto(v => ({ ...v, placa: e.target.value.toUpperCase() }))}
+              placeholder="Placa *" className="w-full border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+            <div className="grid grid-cols-3 gap-2">
+              <input value={nuevoAuto.marca} onChange={e => setNuevoAuto(v => ({ ...v, marca: e.target.value }))}
+                placeholder="Marca" className="border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+              <input value={nuevoAuto.modelo} onChange={e => setNuevoAuto(v => ({ ...v, modelo: e.target.value }))}
+                placeholder="Modelo" className="border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+              <input value={nuevoAuto.anio} onChange={e => setNuevoAuto(v => ({ ...v, anio: e.target.value }))}
+                placeholder="Año" type="number" className="border border-[#e5e5e5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8]" />
+            </div>
+            <p className="text-[11px] text-[#9ca3af]">Fotos, VIN y demás datos se pueden completar después en Autos.</p>
+            {errorAlta && <p className="text-[#dc2626] text-xs">{errorAlta}</p>}
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setModalAuto(false)}
+                className="bg-white border border-[#e5e5e5] text-[#374151] px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancelar</button>
+              <button type="button" onClick={handleCrearAuto} disabled={guardandoAlta}
+                className="bg-[#1d4ed8] hover:bg-[#1e40af] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                {guardandoAlta ? 'Guardando…' : 'Guardar auto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
